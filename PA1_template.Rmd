@@ -1,20 +1,260 @@
-# Reproducible Research: Peer Assessment 1
+---
+title: "Assignment1"
+output: html_document
+---
+
+Obtained activity data from: [here](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) 
+
+Data was logged in 5 minute intervals.
+
+```{r}
+
+data <- read.csv("activity.csv")
+nrow(data)
+
+steps <- data$steps
+sum(steps, na.rm = TRUE)
+days <- split(steps, data$date)
+numDays <- length(days)
+numDays
+
+rowsPerDay <- nrow(data) / length(days)
+rowsPerDay
+
+```
+
+### Means and Medians
+
+```{r}
+
+# Make a histogram of the total number of steps taken each day
+
+# sums
+daySums <- sapply(1:length(days), function (d) sum (days[[d]], rm.na = TRUE))
+hist(daySums)
+
+# Calculate and report the mean and median total number of steps taken per day
+
+# means
+dayMeans <- sapply(1:length(days), function (d) mean (days[[d]], rm.na = TRUE))
+dayMeans
+
+# medians
+dayMedians <- sapply(1:length(days), function (d) median (days[[d]], na.rm = TRUE))
+dayMedians
+
+```
+
+### Mean per 5 minute interval
+
+```{r}
+
+startIndices <- (0 : (numDays - 1)) * rowsPerDay
+intervalsFunc <- function (i) startIndices + i
+intervals <- sapply(1:rowsPerDay, intervalsFunc)
+
+f <- function (x) {
+  ns <- steps[intervals[,x]] # get interval across all days
+  ns <- ns[!is.na(ns)] # remove nas
+  if(length(ns) > 0){
+    mean(ns)
+  } else {
+    0 # if there is no data for this day, return a default of 0
+  }
+}
+
+# the mean for each of the intervals
+imeans <- sapply(1:rowsPerDay, f)
+
+# Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+graphics::plot.default(
+  x = 1:rowsPerDay,
+  y = imeans,
+  type = "l",
+  xlab = "5 minute interval",
+  ylab = "Mean",
+  main = "Mean per 5 minute interval"
+)
+
+# Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+max(imeans) # the highest average number of steps
+which.max(imeans) # this interval had the highest average number of steps
+
+```
+
+### Missing Values
+
+```{r}
+
+# Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+# total number of missing values in the dataset
+length(steps[is.na(steps)])
+
+# converts an index into one of the intervals
+index2interval <- function (i) {
+  day <- ceiling(i / rowsPerDay)
+  i - ((day - 1) * rowsPerDay)
+}
+
+# converts an index into a value. 
+# if the step data exists, it will be returned, 
+# otherwise the average for that interval across all days is returned
+f <- function (x) {
+  entry <- steps[[x]]
+  if(is.na(entry)){
+    q <- index2interval(x);
+    z <- imeans[q]
+    z
+  } else {
+    entry
+  }
+}
+
+# Devise a strategy for filling in all of the missing values in the dataset.
+# Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+# creates a new vector of step data where missing input is replaced by the average at that interval across all days 
+newSteps <- sapply(1:length(steps), f)
+sum(newSteps)
+newDays <- split(steps, data$date)
+
+# Make a histogram of the total number of steps taken each day 
+newDaySums <- sapply(1:length(newDays), function (d) sum (newDays[[d]]))
+hist(newDaySums)
+
+# Calculate and report the mean and median total number of steps taken per day. 
+
+# means
+newDayMeans <- sapply(1:length(newDays), function (d) mean (newDays[[d]]))
+newDayMeans
+
+# medians
+newDayMedians <- sapply(1:length(newDays), function (d) median (newDays[[d]]))
+newDayMedians
+
+```
+
+*Do these values differ from the estimates from the first part of the assignment?*
+
+The new means and medians appear to be similar to the original data.
+
+*What is the impact of inputing missing data on the estimates of the total daily number of steps?*
+
+Inputing missing data did not have a big impact on the total daily number of steps.
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+Data starts on Monday (Oct 1, 2012) and ends Friday (Nov 30, 2012).
+
+The data spans 8 weeks and 5 weekdays, so there should be 45 weekdays and 16 weekends.
+
+```{r}
+
+f <- function (x) {
+  
+  date <- as.Date(data$date[x])
+  dayName <- weekdays(date)
+  if(dayName == "Saturday" || dayName == "Sunday"){
+    "weekend"
+  } else {
+    "weekday"
+  }
+   
+}
+
+# Create a new factor variable in the dataset with two levels - "weekday" and "weekend"
+
+dayTypes <- sapply(1 : nrow(data), f)
+
+length(dayTypes[dayTypes == "weekday"]) / rowsPerDay
+length(dayTypes[dayTypes == "weekend"]) / rowsPerDay
+
+```
+
+### Mean per 5 minute interval for weekdays 
+
+```{r}
+
+newData <- cbind(newSteps, dayTypes)
+newData <- as.matrix(newData)
+
+# Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+weekDaySteps <- newData[newData[,2] == "weekday", 1]
+newNumDays <- length(weekDaySteps) / rowsPerDay
+newNumDays
+
+startIndices <- (0 : (newNumDays - 1)) * rowsPerDay
+intervalsFunc <- function (i) startIndices + i
+intervals <- sapply(1:rowsPerDay, intervalsFunc)
+
+f <- function (x) {
+  ns <- as.numeric(weekDaySteps[intervals[,x]]) # get interval across all days
+  ns <- ns[!is.na(ns)] # remove nas
+  if(length(ns) > 0){
+    mean(ns)
+  } else {
+    0 # if there is no data for this day, return a default of 0
+  }
+}
+
+# the mean for each of the intervals
+imeans <- sapply(1:rowsPerDay, f)
+
+# Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+graphics::plot.default(
+  x = 1:rowsPerDay,
+  y = imeans,
+  type = "l",
+  xlab = "5 minute interval",
+  ylab = "Mean",
+  main = "Mean per 5 minute interval for weekdays"
+)
 
 
-## Loading and preprocessing the data
+```
+
+### Mean per 5 minute interval for weekends
+
+```{r}
+
+weekEndSteps <- newData[newData[,2] == "weekend", 1]
+newNumDays <- length(weekEndSteps) / rowsPerDay
+newNumDays
+
+startIndices <- (0 : (newNumDays - 1)) * rowsPerDay
+intervalsFunc <- function (i) startIndices + i
+intervals <- sapply(1:rowsPerDay, intervalsFunc)
+
+f <- function (x) {
+  ns <- as.numeric(weekEndSteps[intervals[,x]]) # get interval across all days
+  ns <- ns[!is.na(ns)] # remove nas
+  if(length(ns) > 0){
+    mean(ns)
+  } else {
+    0 # if there is no data for this day, return a default of 0
+  }
+}
+
+# the mean for each of the intervals
+imeans <- sapply(1:rowsPerDay, f)
+
+# Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+graphics::plot.default(
+  x = 1:rowsPerDay,
+  y = imeans,
+  type = "l",
+  xlab = "5 minute interval",
+  ylab = "Mean",
+  main = "Mean per 5 minute interval for weekends"
+)
 
 
+```
 
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+### End.
